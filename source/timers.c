@@ -31,8 +31,11 @@ void Init_SysTick(void)
 
 void SysTick_Handler(void)
 {
+	uint32_t masking_state = __get_PRIMASK();
+	__disable_irq();
 	++tick_count;
 	++timer_count;
+	__set_PRIMASK(masking_state);
 }
 
 ticktime_t now()
