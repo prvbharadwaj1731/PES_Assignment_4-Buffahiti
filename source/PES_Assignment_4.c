@@ -33,13 +33,27 @@
  * @brief   Application entry point.
  */
 
-#define DEBUG_DELAY_MS 5000
-#define DEBUG_DELAY_WARNING_MS 3000
-#define PRODUCTION_DELAY_MS 20000
-#define PRODUCTION_DELAY_WARNING_MS 5000
+#ifdef DEBUG
+#define DELAY_MS 5000
+#define DELAY_WARNING_MS 3000
+#else
+#define DELAY_MS 20000
+#define DELAY_WARNING_MS 5000
+#endif
+
+//#define DEBUG_DELAY_MS 5000
+//#define DEBUG_DELAY_WARNING_MS 3000
+//#define PRODUCTION_DELAY_MS 20000
+//#define PRODUCTION_DELAY_WARNING_MS 5000
+#define TRANSITION_DELAY_MS 1000
+#define LOOP_RESOLUTION 100
+#define PWM_PERIOD 48000
 
 
 #include <stdio.h>
+#include <stddef.h>
+#include <stdbool.h>
+
 #include "board.h"
 #include "peripherals.h"
 #include "pin_mux.h"
@@ -51,17 +65,19 @@
 #include "led_control.h"
 #include "pwm.h"
 #include "tsi.h"
+#include "state_machine.h"
+#include "log.h"
 /* TODO: insert other definitions and declarations here. */
 
 /*
  * @brief   Application entry point.
  */
 
-typedef enum{
-   STOP_TO_GO = 1,
-   GO_TO_WARNING = 2,
-   WARNING_TO_STOP = 4
-}state;
+//typedef enum{
+//   STOP_TO_GO = 1,
+//   GO_TO_WARNING = 2,
+//   WARNING_TO_STOP = 4
+//}state;
 
 
 int main(void) {
@@ -80,91 +96,120 @@ int main(void) {
     Init_SysTick();
     LED_INIT();
     TSI_INIT();
-    pwm_init(48000);
-
-    state current_state = STOP_TO_GO;
-
-    uint32_t touch_val, delay_counter;
-
-    //declaring the color codes for the various states in decimal representation
-    color_code STOP, WARNING, GO, CROSSWALK;
-
-    STOP.red = 97;
-    STOP.blue = 30;
-    STOP.green = 60;
-
-    WARNING.red = 255;
-    WARNING.green = 178;
-    WARNING.blue = 0;
-
-    GO.red = 34;
-    GO.green = 150;
-    GO.blue = 34;
-
-    CROSSWALK.red = 0;
-    CROSSWALK.green = 16;
-    CROSSWALK.blue = 48;
+    pwm_init(PWM_PERIOD);
 
 
-    SET_LED_COLOR(STOP, 48000);
+    state current_state = STOP;
+    color_code current_color;
+    uint8_t transition_fraction = 1; //start off with 1 part of the transition
+    uint32_t delay_counter = 0; //initialize delay value
+    bool touch_event;
 
+    LOG("Main loop starting.\n");
 
     while(1){
-    	 switch(current_state)
-    	    {
-    	    case STOP_TO_GO:
-    	    	COLOR_TRANSITION(STOP,GO);
-    	    	break;
 
-    	    case GO_TO_WARNING:
-    	    	COLOR_TRANSITION(GO,WARNING);
-    	    	break;
+    	current_color = state_machine(current_state, transition_fraction, current_color);
+    	touch_event = TSI_READ();
 
-    	    case WARNING_TO_STOP:
-    	    	COLOR_TRANSITION(WARNING,STOP);
-    	    	break;
-    	    }
+    	//advancing states
 
-    	 	//Because WARNING state has a different delay requirement
-    	    if(current_state & GO_TO_WARNING)
-    	    	delay_counter == DEBUG_DELAY_WARNING_MS/100;
-    	    else
-    	    	delay_counter = DEBUG_DELAY_MS/100;
+    	// since warning state has a different timing
+    	if(delay_counter == DELAY_WARNING_MS/100)
+    	{
+    		if(current_state == WARNING){
+    			current_state = WARNING_TO_STOP_TRANSITION;
+    			LOG("transitioning from WARNING TO STOP at %d ms\n", 16*now());
+    			delay_counter = 0; //reset counter
+				transition_fraction = 1;
+    		}
+    	}
 
-    	    //light timing delay
-    	    for(int i=0;i<delay_counter;i++)
-    	    {
-    	    	delay_ms(100);
-    	    	touch_val = TSI_READ();
-    	    	if(touch_val > 50)
-    	    	{
-    	    		color_code start_color;
-    	    		if(current_state == STOP_TO_GO)
-    	    			start_color = GO;
-    	    		else if(current_state == GO_TO_WARNING)
-    	    			start_color = WARNING;
-    	    		else if(current_state == WARNING_TO_STOP)
-    	    			start_color = STOP;
+    	if(current_state == CROSSWALK) //because a blocking function takes care of the pattern
+    			{
+    				current_state = CROSSWALK_TO_GO_TRANSITION;
+    				LOG("transitioning from CROSSWALK to GO at %d ms\n", 16*now());
+    				delay_counter = 0; //reset counter
+    				transition_fraction = 1;
+    			}
 
-    	    		CROSSWALK_MODE(start_color, CROSSWALK);
-    	    		COLOR_TRANSITION(CROSSWALK,GO);
-    	    		current_state = STOP_TO_GO;
-    	    	}
-    	    }
 
-    	    //advancing state
-    	    if(current_state == STOP_TO_GO)
-    	    	current_state = GO_TO_WARNING;
+    	// if transitions are completed
+    	if(delay_counter == TRANSITION_DELAY_MS/100)
+    	{
+    		if(current_state == STOP_TO_GO_TRANSITION){
+    			current_state = GO;
+        		delay_counter = 0; //reset counter
+        		transition_fraction = 1;
+    		}
+    		else if(current_state == GO_TO_WARNING_TRANSITION){
+    			current_state = WARNING;
+    			delay_counter = 0; //reset counter
+				transition_fraction = 1;
+    		}
+    		else if(current_state == WARNING_TO_STOP_TRANSITION){
+    			current_state = STOP;
+    			delay_counter = 0; //reset counter
+				transition_fraction = 1;
+    		}
+    		else if(current_state == CROSSWALK_TRANSITION){
+    			current_state = CROSSWALK;
+    			delay_counter = 0; //reset counter
+    			transition_fraction = 1;
+    		}
+    		else if(current_state == CROSSWALK_TO_GO_TRANSITION){
+    			current_state = GO;
+    			delay_counter = 0; //reset counter
+				transition_fraction = 1;
+    		}
+    	}
 
-    	    else if(current_state == GO_TO_WARNING)
-    	    	current_state = WARNING_TO_STOP;
+    	// timing for the traffic lights
+    	if(delay_counter == DELAY_MS/100)
+    	{
+    		if(current_state == STOP){
+    			current_state = STOP_TO_GO_TRANSITION;
+    			LOG("transitioning from STOP to GO at %d ms\n", 16*now());
+        		delay_counter = 0; //reset counter
+        		transition_fraction = 1;
+    		}
 
-    	    else if(current_state == WARNING_TO_STOP)
-    	    	current_state = STOP_TO_GO;
+    		else if(current_state == GO){
+    			current_state = GO_TO_WARNING_TRANSITION;
+    			LOG("transitioning from GO to WARNING at %d ms\n", 16*now());
+        		delay_counter = 0; //reset counter
+        		transition_fraction = 1;
+    		}
+
+
+    	}
+
+
+    	// if we are transitioning between colors, handle fraction count and delay separately
+    	if(current_state == STOP_TO_GO_TRANSITION || GO_TO_WARNING_TRANSITION || WARNING_TO_STOP_TRANSITION || CROSSWALK_TRANSITION|| CROSSWALK_TO_GO_TRANSITION)
+    	{
+    		transition_fraction++;
+			delay_counter++;
+    	}
+    	else
+    		delay_counter++;
+
+
+
+    	// if a touch event has been registered previously, we update state
+    	if(touch_event)
+    	{
+    		state temp_state = current_state;
+    		current_state = CROSSWALK_TRANSITION;
+    		LOG("Button press detected at %d ms\n", 16*now());
+    		LOG("transitioning from %s to CROSSWALK at %d ms\n", temp_state, 16*now());
+    		delay_counter = 0;
+    		transition_fraction = 1;
+    	}
+
+
+
+    	delay_ms(LOOP_RESOLUTION);
     }
-
-
-
-
-    return 0 ;
+    return 0;
 }

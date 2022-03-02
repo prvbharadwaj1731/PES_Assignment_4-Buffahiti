@@ -1,5 +1,5 @@
-pwm.c:24:6:pwm_init	16	static
-pwm.c:56:6:SET_LED_COLOR	16	static
-pwm.c:63:13:CLEAR_LED	8	static
-pwm.c:70:6:COLOR_TRANSITION	40	static
-pwm.c:95:6:CROSSWALK_MODE	24	static
+pwm.c:26:6:pwm_init	16	static
+pwm.c:58:12:set_led_color	24	static
+pwm.c:67:13:CLEAR_LED	8	static
+pwm.c:75:12:color_transition	40	static
+pwm.c:86:12:crosswalk_pattern	32	static

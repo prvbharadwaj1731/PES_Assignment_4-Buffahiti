@@ -8,16 +8,16 @@
 #define TSI0_GENCS_EOSF 2 // scan complete bit. gets set once scan is complete
 #define TSI0_DATA_START 22
 #define TOUCH_OFFSET 560
+#define TOUCH_THRESHOLD 50
 
 #include "MKL25Z4.h"
 #include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
 
 void TSI_INIT(void)
 {
 	SIM->SCGC5 |= SIM_SCGC5_TSI_MASK;
-//	TSI0->GENCS |= (1 << TSI0_GENCS_ENABLE);
-//	TSI0->GENCS |= TSI_GENCS_NSCN(31u);
-
 	TSI0->GENCS = TSI_GENCS_MODE(0u) | //operating in non-noise mode
 								TSI_GENCS_REFCHRG(0u) | //reference oscillator charge and discharge value 500nA
 								TSI_GENCS_DVOLT(0u) | //oscillator voltage rails set to default
@@ -28,7 +28,7 @@ void TSI_INIT(void)
 								TSI_GENCS_EOSF_MASK; // writing one to clear the end of scan flag
 }
 
-uint32_t TSI_READ(void)
+bool TSI_READ(void)
 {
 	uint32_t capacitive_reading = 0;
 	TSI0->DATA = TSI_DATA_TSICH(10u); //use channel 10
@@ -40,5 +40,8 @@ uint32_t TSI_READ(void)
 
 	capacitive_reading = TSI0->DATA & 0xFFFF; // storing last 16 bits
 	TSI0->GENCS |= TSI_GENCS_EOSF_MASK; // clear EOSF bit by writing 1 to it
-	return capacitive_reading - TOUCH_OFFSET;
+	if((capacitive_reading - TOUCH_OFFSET)>50)
+		return true;
+	else
+		return false;
 }

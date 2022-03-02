@@ -20,7 +20,7 @@ source/PES_Assignment_4.o source/PES_Assignment_4.d: \
  C:\Users\prvbh\Documents\MCUXpressoIDE_11.2.0_4120\workspace\PES_Assignment_4\CMSIS/MKL25Z4.h \
  C:\Users\prvbh\Documents\MCUXpressoIDE_11.2.0_4120\workspace\PES_Assignment_4\utilities/fsl_debug_console.h \
  ../source/timers.h ../source/led_control.h ../source/pwm.h \
- ../source/tsi.h
+ ../source/tsi.h ../source/state_machine.h ../source/log.h
 
 C:\Users\prvbh\Documents\MCUXpressoIDE_11.2.0_4120\workspace\PES_Assignment_4\board/board.h:
 
@@ -67,3 +67,7 @@ C:\Users\prvbh\Documents\MCUXpressoIDE_11.2.0_4120\workspace\PES_Assignment_4\ut
 ../source/pwm.h:
 
 ../source/tsi.h:
+
+../source/state_machine.h:
+
+../source/log.h:

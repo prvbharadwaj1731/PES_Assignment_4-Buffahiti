@@ -8,10 +8,12 @@
 #define MAX_COLOR_CODE 255
 #define TIMER_RESOLUTION 63
 #define COLOR_CHANGE_PERIOD_MS 0.0625 //(1/16th of a second)
-#define test 1/COLOR_CHANGE_PERIOD_MS
 #define CROSSWALK_ONTIME_MS 750
 #define CROSSWALK_OFFTIME_MS 250
 #define CROSSWALK_PERIOD_S 10
+#define TPM_PERIOD_TICKS 48000
+#define TRANSITION_RESOLUTION_POW 3
+
 
 #include <stdint.h>
 #include <stdio.h>
@@ -53,11 +55,13 @@ void pwm_init(uint16_t period)
 	TPM2->SC |= TPM_SC_CMOD(1);
 }
 
-void SET_LED_COLOR(color_code color_in, uint16_t period)
+color_code set_led_color(color_code color_in)
 {
-	TPM0->CONTROLS[1].CnV = (uint32_t)((color_in.blue*period)/MAX_COLOR_CODE);
-	TPM2->CONTROLS[1].CnV = (uint32_t)((color_in.green*period)/MAX_COLOR_CODE);
-	TPM2->CONTROLS[0].CnV = (uint32_t)((color_in.red*period)/MAX_COLOR_CODE);
+	TPM0->CONTROLS[1].CnV = (color_in.blue*TPM_PERIOD_TICKS)/MAX_COLOR_CODE;
+	TPM2->CONTROLS[1].CnV = (color_in.green*TPM_PERIOD_TICKS)/MAX_COLOR_CODE;
+	TPM2->CONTROLS[0].CnV = (color_in.red*TPM_PERIOD_TICKS)/MAX_COLOR_CODE;
+
+	return color_in;
 }
 
 static void CLEAR_LED(void)
@@ -67,40 +71,28 @@ static void CLEAR_LED(void)
 	TPM2->CONTROLS[0].CnV = 0;
 }
 
-void COLOR_TRANSITION(color_code start_color, color_code end_color)
+
+color_code color_transition(color_code start_color, color_code end_color, uint8_t fraction)
 {
 	color_code temp_color;
-	for(int j=0;j<16;j++)
-	{
-		temp_color.red = (end_color.red - start_color.red)*(j+1)*0.125 + start_color.red;
-		temp_color.green = (end_color.green - start_color.green)*(j+1)*0.125 + start_color.green;
-		temp_color.blue = (end_color.blue - start_color.blue)*(j+1)*0.125 + start_color.blue;
-		SET_LED_COLOR(temp_color, 48000);
-		delay_ms(TIMER_RESOLUTION);
-	}
+	temp_color.red = ((end_color.red - start_color.red)*(fraction)>>TRANSITION_RESOLUTION_POW) + start_color.red;
+	temp_color.green = ((end_color.green - start_color.green)*(fraction)>>TRANSITION_RESOLUTION_POW) + start_color.green;
+	temp_color.blue = ((end_color.blue - start_color.blue)*(fraction)>>TRANSITION_RESOLUTION_POW) + start_color.blue;
+	set_led_color(temp_color);
+	return temp_color;
 }
 
-//color_code COLOR_TRANSITION(color_code start_color, color_code end_color, uint32_t scaling)
-//{
-//	color_code temp_color;
-//	temp_color.red = (end_color.red - start_color.red)*(scaling+1)*0.125 + start_color.red;
-//	temp_color.green = (end_color.green - start_color.green)*(scaling+1)*0.125 + start_color.green;
-//	temp_color.blue = (end_color.blue - start_color.blue)*(scaling+1)*0.125 + start_color.blue;
-//	SET_LED_COLOR(temp_color, 48000);
-//	//delay_ms(TIMER_RESOLUTION);
-//
-//	return temp_color;
-//}
 
-void CROSSWALK_MODE(color_code start_color, color_code end_color)
+color_code crosswalk_pattern(color_code color_in)
 {
-	COLOR_TRANSITION(start_color, end_color);
-	for(int i=0;i<CROSSWALK_PERIOD_S;i++)
+	for(int i=0;i<CROSSWALK_PERIOD_S;i++) //hardcoded delay for crosswalk
 	{
-		delay_ms(CROSSWALK_ONTIME_MS);
+		color_code temp_color;
+		temp_color = set_led_color(color_in);
+		delay_ms(750); //ON time
 		CLEAR_LED();
-		delay_ms(CROSSWALK_OFFTIME_MS);
-		SET_LED_COLOR(end_color, 48000);
+		delay_ms(250); //OFF time
 	}
+	return color_in;
 }
 

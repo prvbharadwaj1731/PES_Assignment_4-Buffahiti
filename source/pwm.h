@@ -20,8 +20,10 @@ typedef struct {
 
 void pwm_init(uint16_t);
 
-void SET_LED_COLOR(color_code, uint16_t);
+color_code set_led_color(color_code);
 
-void COLOR_TRANSITION(color_code, color_code);
+color_code color_transition(color_code, color_code, uint8_t);
 
-void CROSSWALK_MODE(color_code, color_code);
+color_code crosswalk_pattern(color_code);
+
+//void CROSSWALK_MODE(color_code, color_code);

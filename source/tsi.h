@@ -15,4 +15,4 @@
 
 void TSI_INIT(void);
 
-uint32_t TSI_READ(void);
+bool TSI_READ(void);
